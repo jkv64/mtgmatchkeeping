@@ -40,6 +40,7 @@ async def get_deck(deck_id: str, db: AsyncSession = Depends(get_db)):
 # decklist create (not in original minimal spec but useful)
 @app.post("/decklist", response_model=schemas.DecklistOut)
 async def create_decklist(decklist_in: schemas.DecklistCreate, db: AsyncSession = Depends(get_db)):
+    # expecting MTGO format
     dl = await crud.create_decklist(db, decklist_in)
     return dl
 
@@ -137,11 +138,20 @@ async def create_player(player_in: schemas.PlayerCreate, db: AsyncSession = Depe
     p = await crud.create_player(db, player_in)
     return p
 
+# @app.get("/players", response_model=List[schemas.PlayerOut])
+# async def list_players(
+#     skip: int = Query(0, ge=0),
+#     limit: int = Query(100, ge=1, le=500),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     players = await crud.get_players(db, skip=skip, limit=limit)
+#     return players
+
 # --- Match endpoints ---
 @app.post("/match", response_model=schemas.MatchOut)
 async def create_match(match_in: schemas.MatchCreate, db: AsyncSession = Depends(get_db)):
-    # basic validation: at least one game in game_win_array
-    if not match_in.game_win_array or len(match_in.game_win_array) == 0:
+    # basic validation: at least two game in game_win_array
+    if not match_in.game_win_array or len(match_in.game_win_array) < 2:
         raise HTTPException(status_code=400, detail="game_win_array must have at least one element")
     m = await crud.create_match(db, match_in)
     return m

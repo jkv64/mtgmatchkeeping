@@ -45,9 +45,12 @@ async def create_match(db: AsyncSession, match_in: schemas.MatchCreate) -> model
         decklist_id=match_in.decklist_id,
         player_id=match_in.player_id,
         opponent_name=match_in.opponent_name,
-        opponent_archetype=match_in.opponent_archetype,
+        opponent_deck_id=match_in.opponent_deck_id,
+        opponent_decklist_id=match_in.opponent_decklist_id,
+        opponent_player_id=match_in.opponent_player_id,
         game_win_array=match_in.game_win_array,
         mulligan_array=match_in.mulligan_array,
+        opponent_mulligan_array=match_in.opponent_mulligan_array,
         play_draw_array=match_in.play_draw_array,
         game2_sideboard=match_in.game2_sideboard,
         game3_sideboard=match_in.game3_sideboard
@@ -64,6 +67,16 @@ async def get_deck(db: AsyncSession, deck_id: str) -> Optional[models.Deck]:
 async def get_decklist(db: AsyncSession, decklist_id: str) -> Optional[models.Decklist]:
     res = await db.get(models.Decklist, decklist_id)
     return res
+
+# async def get_decks(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Deck]:
+#     q = select(models.Deck).offset(skip).limit(limit)
+#     res = await db.execute(q)
+#     return res.scalars().all()
+
+# async def get_players(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Player]:
+#     q = select(models.Player).offset(skip).limit(limit)
+#     res = await db.execute(q)
+#     return res.scalars().all()
 
 async def get_matches_for_deck(db: AsyncSession, deck_id: str, time_from: Optional[datetime.datetime]=None, time_to: Optional[datetime.datetime]=None) -> List[models.Match]:
     q = select(models.Match).where(models.Match.deck_id == deck_id)

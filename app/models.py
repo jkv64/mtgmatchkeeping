@@ -1,8 +1,10 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, JSON, Text
+from sqlalchemy import Column, String, DateTime, ForeignKey, JSON, Text, Integer
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 import uuid
+
+# Database models for MTG Matchkeeping
 
 Base = declarative_base()
 
@@ -20,7 +22,7 @@ class Deck(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     decklists = relationship("Decklist", back_populates="deck")
-    matches = relationship("Match", back_populates="deck")
+    matches = relationship("Match", primaryjoin="Deck.id == Match.deck_id", back_populates="deck")
 
 
 class Decklist(Base):
@@ -33,7 +35,7 @@ class Decklist(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     deck = relationship("Deck", back_populates="decklists")
-    matches = relationship("Match", back_populates="decklist")
+    matches = relationship("Match", primaryjoin="Decklist.id == Match.decklist_id", back_populates="decklist")
 
 
 class Player(Base):
@@ -46,7 +48,7 @@ class Player(Base):
     melee_account = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    matches = relationship("Match", back_populates="player")
+    matches = relationship("Match", primaryjoin="Player.id == Match.player_id", back_populates="player")
 
 
 class Match(Base):
@@ -57,14 +59,20 @@ class Match(Base):
     decklist_id = Column(String, ForeignKey("decklists.id"))
     player_id = Column(String, ForeignKey("players.id"))
     opponent_name = Column(String)
-    opponent_archetype = Column(String)
-    game_win_array = Column(ARRAY(String))  # ["1", "0", "1"] for W/L/W
-    mulligan_array = Column(ARRAY(String))  # ["0", "1", "2"] mulligans per game
+    opponent_deck_id = Column(String, ForeignKey("decks.id"))
+    opponent_decklist_id = Column(String, ForeignKey("decklists.id"))
+    opponent_player_id = Column(String, ForeignKey("players.id"))
+    game_win_array = Column(ARRAY(Integer))  # [1, 0, 1] for W/L/W
+    mulligan_array = Column(ARRAY(Integer))  # [0, 1, 2] mulligans per game
+    opponent_mulligan_array = Column(ARRAY(Integer))  # [0, 1, 2] mulligans per game
     play_draw_array = Column(ARRAY(String))  # ["play", "draw", "play"]
     game2_sideboard = Column(JSON)
     game3_sideboard = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    deck = relationship("Deck", back_populates="matches")
-    decklist = relationship("Decklist", back_populates="matches")
-    player = relationship("Player", back_populates="matches")
+    deck = relationship("Deck", back_populates="matches", foreign_keys=[deck_id])
+    decklist = relationship("Decklist", back_populates="matches", foreign_keys=[decklist_id])
+    player = relationship("Player", back_populates="matches", foreign_keys=[player_id])
+    opponent_deck = relationship("Deck", back_populates="matches", foreign_keys=[opponent_deck_id])
+    opponent_decklist = relationship("Decklist", back_populates="matches", foreign_keys=[opponent_decklist_id])
+    opponent_player = relationship("Player", back_populates="matches", foreign_keys=[opponent_player_id])
