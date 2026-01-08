@@ -166,13 +166,8 @@ POST /decklist
 ```json
 {
   "deck_id": "uuid-of-deck",
-  "mainboard": [
-    {"name": "Arclight Phoenix", "quantity": 4},
-    {"name": "Lightning Bolt", "quantity": 4}
-  ],
-  "sideboard": [
-    {"name": "Blood Moon", "quantity": 2}
-  ]
+  "mainboard": "4 Ocelot Pride\n4 Guide of Souls\n4 Galvanic Discharge\n",
+  "sideboard": "2 Blood Moon\n"
 }
 ```
 
@@ -209,7 +204,9 @@ POST /match
   "decklist_id": "uuid-of-decklist",
   "player_id": "uuid-of-player",
   "opponent_name": "OpponentUsername",
-  "opponent_archetype": "Amulet Titan",
+  "opponent_deck_id": "uuid-of-opp-deck",
+  "opponent_decklist_id": "uuid-of-opp-decklist",
+  "opponent_player_id": "uuid-of-opponent",
   "game_win_array": [1, 0, 1],
   "mulligan_array": [0, 1, 0],
   "play_draw_array": ["play", "draw", "play"],
