@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from . import database, models, schemas, crud
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -17,6 +18,28 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        from .auth import SECRET_KEY, ALGORITHM
+        import jwt
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except jwt.InvalidTokenError:
+        raise credentials_exception
+    user = await crud.get_user_by_email(db, email=email)
+    if user is None:
+        raise credentials_exception
+    return user
+
 # --- Startup: create tables (simple approach) ---
 @app.on_event("startup")
 async def startup():
@@ -24,10 +47,44 @@ async def startup():
         # NOTE: in production use Alembic instead of create_all
         await conn.run_sync(models.Base.metadata.create_all)
 
+# --- Auth endpoints ---
+@app.post("/register", response_model=schemas.UserOut)
+async def register(user_in: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    existing_user = await crud.get_user_by_email(db, email=user_in.email)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    existing_username = await crud.get_user_by_username(db, username=user_in.username)
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    from .auth import get_password_hash
+    hashed_password = get_password_hash(user_in.password)
+    user = await crud.create_user(db, user_in, hashed_password)
+    return user
+
+@app.post("/token", response_model=schemas.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    # Try fetching by email first
+    user = await crud.get_user_by_email(db, email=form_data.username)
+    # Fallback to fetching by username if no user was found with that email
+    if not user:
+        user = await crud.get_user_by_username(db, username=form_data.username)
+        
+    from .auth import verify_password, create_access_token
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
 # --- Deck endpoints ---
 @app.post("/deck", response_model=schemas.DeckOut)
-async def create_deck(deck_in: schemas.DeckCreate, db: AsyncSession = Depends(get_db)):
-    deck = await crud.create_deck(db, deck_in)
+async def create_deck(deck_in: schemas.DeckCreate, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    deck = await crud.create_deck(db, deck_in, user_id=current_user.id)
     return deck
 
 @app.get("/deck/{deck_id}", response_model=schemas.DeckOut)
@@ -39,9 +96,9 @@ async def get_deck(deck_id: str, db: AsyncSession = Depends(get_db)):
 
 # decklist create (not in original minimal spec but useful)
 @app.post("/decklist", response_model=schemas.DecklistOut)
-async def create_decklist(decklist_in: schemas.DecklistCreate, db: AsyncSession = Depends(get_db)):
+async def create_decklist(decklist_in: schemas.DecklistCreate, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # expecting MTGO format
-    dl = await crud.create_decklist(db, decklist_in)
+    dl = await crud.create_decklist(db, decklist_in, user_id=current_user.id)
     return dl
 
 @app.get("/deck/{deck_id}/stats", response_model=schemas.DeckStats)

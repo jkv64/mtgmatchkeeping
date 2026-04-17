@@ -2,6 +2,26 @@ from pydantic import BaseModel, field_validator
 import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+# --- User schemas ---
+class UserCreate(BaseModel):
+    email: str
+    username: str
+    password: str
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    username: str
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    email: Optional[str] = None
 
 
 # --- Deck schemas ---
@@ -9,6 +29,7 @@ class DeckCreate(BaseModel):
     name: str
     format: Optional[str] = None
     colors: Optional[str] = None
+    image_url: Optional[str] = None
     raw_data: Optional[Dict[str, Any]] = None
 
     @field_validator('colors')
@@ -25,9 +46,11 @@ class DeckCreate(BaseModel):
 
 class DeckOut(BaseModel):
     id: str
+    user_id: Optional[str] = None
     name: str
     format: Optional[str] = None
     colors: Optional[str] = None
+    image_url: Optional[str] = None
     raw_data: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
 
@@ -66,6 +89,7 @@ class DecklistCreate(BaseModel):
 
 class DecklistOut(BaseModel):
     id: str
+    user_id: Optional[str] = None
     deck_id: str
     mainboard: Optional[List[Dict[str, Any]]] = None
     sideboard: Optional[List[Dict[str, Any]]] = None

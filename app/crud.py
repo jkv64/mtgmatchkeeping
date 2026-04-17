@@ -4,11 +4,34 @@ from . import models, schemas
 from typing import Optional, List, Dict, Any
 import datetime
 
-async def create_deck(db: AsyncSession, deck_in: schemas.DeckCreate) -> models.Deck:
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[models.User]:
+    q = select(models.User).where(models.User.email == email)
+    res = await db.execute(q)
+    return res.scalars().first()
+
+async def get_user_by_username(db: AsyncSession, username: str) -> Optional[models.User]:
+    q = select(models.User).where(models.User.username == username)
+    res = await db.execute(q)
+    return res.scalars().first()
+
+async def create_user(db: AsyncSession, user_in: schemas.UserCreate, hashed_password: str) -> models.User:
+    db_user = models.User(
+        email=user_in.email,
+        username=user_in.username,
+        hashed_password=hashed_password
+    )
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user
+
+async def create_deck(db: AsyncSession, deck_in: schemas.DeckCreate, user_id: Optional[str] = None) -> models.Deck:
     deck = models.Deck(
+        user_id=user_id,
         name=deck_in.name,
         format=deck_in.format,
         colors=deck_in.colors,
+        image_url=deck_in.image_url,
         raw_data=deck_in.raw_data,
     )
     db.add(deck)
@@ -16,8 +39,9 @@ async def create_deck(db: AsyncSession, deck_in: schemas.DeckCreate) -> models.D
     await db.refresh(deck)
     return deck
 
-async def create_decklist(db: AsyncSession, dl_in: schemas.DecklistCreate) -> models.Decklist:
+async def create_decklist(db: AsyncSession, dl_in: schemas.DecklistCreate, user_id: Optional[str] = None) -> models.Decklist:
     dl = models.Decklist(
+        user_id=user_id,
         deck_id=dl_in.deck_id,
         mainboard=dl_in.mainboard,
         sideboard=dl_in.sideboard,

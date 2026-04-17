@@ -11,16 +11,32 @@ Base = declarative_base()
 def generate_uuid():
     return str(uuid.uuid4())
 
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    decks = relationship("Deck", back_populates="user")
+    decklists = relationship("Decklist", back_populates="user")
+
+
 class Deck(Base):
     __tablename__ = "decks"
     
     id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"))
     name = Column(String, nullable=False)
     format = Column(String)
     colors = Column(String)
+    image_url = Column(String)
     raw_data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    user = relationship("User", back_populates="decks")
     decklists = relationship("Decklist", back_populates="deck")
     matches = relationship("Match", primaryjoin="Deck.id == Match.deck_id", back_populates="deck")
 
@@ -29,11 +45,13 @@ class Decklist(Base):
     __tablename__ = "decklists"
     
     id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"))
     deck_id = Column(String, ForeignKey("decks.id"), nullable=False)
     mainboard = Column(JSON)
     sideboard = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    user = relationship("User", back_populates="decklists")
     deck = relationship("Deck", back_populates="decklists")
     matches = relationship("Match", primaryjoin="Decklist.id == Match.decklist_id", back_populates="decklist")
 
