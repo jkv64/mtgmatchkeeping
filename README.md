@@ -17,6 +17,18 @@ Authored by Jack Vogel powered by Cursor
 
 The service uses PostgreSQL with the following data models:
 
+### User
+
+Represents a registered user who owns decks and matches.
+
+| Field             | Type     | Description                                      |
+|-------------------|----------|--------------------------------------------------|
+| `id`              | UUID     | Primary key (auto-generated)                     |
+| `email`           | String   | User's email address (unique)                    |
+| `username`        | String   | User's chosen username (unique)                  |
+| `hashed_password` | String   | Securely bcrypt-hashed password                  |
+| `created_at`      | DateTime | Account creation timestamp                       |
+
 ### Deck
 
 Represents a deck archetype you want to track.
@@ -74,6 +86,37 @@ Records individual match results with detailed game-by-game data.
 ---
 
 ## API Endpoints
+
+### Authentication
+
+This API uses OAuth2 with Bearer tokens (JWT). To access protected endpoints (like creating decks or matches), you must first register and obtain an access token.
+
+#### Register a User
+
+```
+POST /register
+```
+
+**Request Body:**
+```json
+{
+  "email": "player@example.com",
+  "username": "mtg_player1",
+  "password": "my_secure_password"
+}
+```
+
+#### Get Token (Login)
+
+```
+POST /token
+```
+
+**Request Body (`application/x-www-form-urlencoded`):**
+- `username`: The user's email OR username
+- `password`: The user's password
+
+Returns JSON containing the access token: `{"access_token": "eyJ...", "token_type": "bearer"}`.
 
 ### Health Check
 
@@ -229,24 +272,36 @@ POST /match
 
 ### Typical Workflow
 
-1. **Create a Deck** to represent the archetype you're playing
-2. **Create a Decklist** (optional) to track specific 75-card configurations
-3. **Create a Player** profile to link your gaming accounts
-4. **Record Matches** after each game session
-5. **Query Statistics** to analyze your performance
+1. **Register & Login** to receive your JWT access token
+2. **Create a Deck** to represent the archetype you're playing (requires auth)
+3. **Create a Decklist** (optional) to track specific 75-card configurations
+4. **Create a Player** profile to link your gaming accounts
+5. **Record Matches** after each game session (requires auth)
+6. **Query Statistics** to analyze your performance
 
 ### Example: Recording a League
 
 ```bash
-# 1. Create your deck
+# 1. Get your Access Token (assuming you already registered)
+# Note: You can pass either email or username to the username parameter
+curl -X POST http://localhost:8000/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=player@example.com&password=my_secure_password"
+
+# Response: {"access_token": "eyJ...", "token_type": "bearer"}
+# Save this token. You will pass it as a Bearer token in the headers below.
+
+# 2. Create your deck
 curl -X POST http://localhost:8000/deck \
+  -H "Authorization: Bearer <YOUR_TOKEN_HERE>" \
   -H "Content-Type: application/json" \
   -d '{"name": "Golgari Yawgmoth", "format": "Modern", "colors": "BG"}'
 
 # Response: {"id": "deck-uuid-here", ...}
 
-# 2. Record match 1 (2-1 win)
+# 3. Record match 1 (2-1 win)
 curl -X POST http://localhost:8000/match \
+  -H "Authorization: Bearer <YOUR_TOKEN_HERE>" \
   -H "Content-Type: application/json" \
   -d '{
     "deck_id": "deck-uuid-here",
@@ -257,7 +312,7 @@ curl -X POST http://localhost:8000/match \
     "play_draw_array": ["draw", "play", "draw"]
   }'
 
-# 3. Check your stats
+# 4. Check your stats
 curl http://localhost:8000/deck/deck-uuid-here/stats
 ```
 
@@ -316,6 +371,7 @@ curl http://localhost:8000/deck/deck-uuid-here/stats
 | Variable       | Description                          | Example                                              |
 |----------------|--------------------------------------|------------------------------------------------------|
 | `DATABASE_URL` | Async PostgreSQL connection string   | `postgresql+asyncpg://user:pass@host:5433/dbname`    |
+| `SECRET_KEY`   | Used to cryptographically sign JWTs  | `09d25e...` (A long random secure string)            |
 
 ### Production Deployment
 
